@@ -1,32 +1,82 @@
 services:
-  jellyfin:
-   image: lscr.io/linuxserver/jellyfin:latest
-   container_name: jellyfin
-   environment:
-     PUID: 1000
-     PGID: 1000
-     TZ: '${TZ:-America/Los_Angeles}'
-   volumes:
-     - ./config/jellyfin:/config
-     - /mnt/teevee:/teevee
-     - /mnt/music:/music
-   ports:
-     - 8096:8096 #Jellyfin HTTP
-   restart: unless-stopped
+  qbittorrent:     #Torrent
+    image: ghcr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: '${TZ:-America/Los_Angeles}'
+      UMASK: 022
+      WEBUI_PORT: ${QBITTORRENT_UI_PORT:-8085}
+      TORRENTING_PORT: ${QBITTORRENT_TOR_PORT:-6881}
+    volumes:
+      - ./config/qbittorrent:/config
+      - media_downloads:/downloads
+    ports:
+      - 8085:8085
+      - 6881:6881
+    restart: unlesss-stopped
+
+  jellyfin:     #Main location for TV Shows, Movies, and Music
+    image: lscr.io/linuxserver/jellyfin:latest
+    container_name: jellyfin
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: '${TZ:-America/Los_Angeles}'
+    volumes:
+      - ./config/jellyfin:/config
+      - /mnt/teevee:/teevee
+      - /mnt/music:/music
+    ports:
+      - 8096:8096 #Jellyfin HTTP
+    restart: unless-stopped
 
   jellyseerr:     #Managing requests for Jellyfin, integrates with Sonarr and Radarr
-   image: fallenbagel/jellyseerr:latest
-   container_name: jellyseerr
-   environment:
-     #PUID: 1000
-     #PGID: 1000
-     TZ: '${TZ:-America/Los_Angeles}'
-     forceIpv4First: true
-   volumes:
-     - ./config/jellyseerr:/app/config
-   ports:
-     - ${JELLYSEERR_PORT:-5055}:5055 # Jellyseerr HTTP Interface
-   restart: unless-stopped
+    image: fallenbagel/jellyseerr:latest
+    container_name: jellyseerr
+    environment:
+      #PUID: 1000
+      #PGID: 1000
+      TZ: '${TZ:-America/Los_Angeles}'
+      forceIpv4First: true
+    volumes:
+      - ./config/jellyseerr:/app/config
+    ports:
+      - ${JELLYSEERR_PORT:-5055}:5055 # Jellyseerr HTTP Interface
+    healthcheck:
+       test: wget --no-verbose --tries=1 --spider http://localhost:5055/api/v1/status || exit 1
+       start_period: 20s
+       timeout: 3s
+       interval: 15s
+       retries: 3
+    restart: unless-stopped
+
+  prowlarr:     #Index manager for Sonarr and Radarr
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: '${TZ:-America/Los_Angeles}'
+    volumes:
+      - ./config/prowlarr:/config
+    ports:
+      - 9696:9696
+    restart: unless-stopped
+
+  bazarr:     #Manages Radarr and Sonarr and downloads subtitles
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: '${TZ:-America/Los_Angeles}'
+    volumes:
+      - ./config/bazarr/:/config
+      - /mnt/torrents/movies:/movies
+      - /mnt/torrents/tv:/tv
+    restart: unless-stopped
 
   sonarr:     #Personal Video Recorder for TV Shows
     image: ghcr.io/linuxserver/sonarr:latest
@@ -38,7 +88,7 @@ services:
       DOCKER_MODS: 'linuxserver/mods:radarr-striptracks'
     volumes:
       - ./config/sonarr:/config
-      - streaming-data:/data
+      - /mnt/torrent/tv:/tv
       - ./config/sonarr/extended/custom-services:/custom-services.d
       - ./config/sonarr/extended/custom-cont-int:/custom-cont-init.d
 
@@ -51,12 +101,26 @@ services:
       TZ: '${TZ:-America/Los_Angeles}'
     volumes:
       - ./config/radarr:/config
-      - streaming-data:/data
+      - /mnt/torrent/movies:/movies
       - ./config/radarr/extended/custom-services:/custom-services.d
       - ./config/radarr/extended/custom-cont-int:/custom-cont-init.d
     restart: unless-stopped
 
-  kavita:
+  lidarr:     #Music collector
+    image: lscr.io/linuxserver/lidarr:latest
+    container_name: lidarr
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: '${TZ:-America/Los_Angeles}'
+    volumes:
+      - ./config/readarr:/config
+      - /mnt/torrents/library:/library
+    ports:
+      - 8686:8686
+    restart: unless-stopped
+
+  kavita:     #Main location for books
     image: lscr.io/linuxserver/kavita:latest
     container_name: kavita
     environment:
@@ -70,34 +134,21 @@ services:
       - 5000:5000
     restart: unless-stopped
 
-  readarr:     #eBook and AudioBook collection manager (Usenet+BitTorrent)
-    image: lscr.io/linuxserver/readarr:develop
-    container_name: readarr
-    environment:
-      PUID: 1000
-      PGID: 1000
-      TZ: '${TZ:-America/Los_Angeles}'
-    volumes:
-      - ./config/readarr:/config
-      - /mnt/library:/library #optional
-    ports:
-      - 8787:8787
-    restart: unless-stopped
 
-  bazarr:
-    image: lscr.io/linuxserver/bazarr:latest
-    container_name: bazarr
+  lazylibrarian:     #Readarr replacement for collecting books
+    image: lscr.io/linuxserver/lazylibrarian:latest
+    container_name: lazylibrarian
     environment:
       PUID: 1000
       PGID: 1000
       TZ: '${TZ:-America/Los_Angeles}'
+      DOCKER_MODS: linuxserver/mods:universal-calibre|linuxserver/mods:lazylibrarian-ffmpeg #optional
     volumes:
-      - tmp_cache:/tmp
-      - ./config/bazarr/:/config
-      - jellyfin_data:/library
+      - ./config/lazylibrarian:/config
+      - /mnt/torrents/library:/libary
+    ports:
+      - 5299:5299
     restart: unless-stopped
 
 volumes:
-  jellyfin-config:
-  kavita-config:
-  streaming-data:
+  something:
