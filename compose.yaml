@@ -11,7 +11,7 @@ services:
       TORRENTING_PORT: ${QBITTORRENT_TOR_PORT:-6881}
     volumes:
       - ./config/qbittorrent:/config
-      - media_downloads:/downloads
+      - /mnt/torrents:/torrents
     ports:
       - 8085:8085
       - 6881:6881
@@ -91,6 +91,7 @@ services:
       - /mnt/torrent/tv:/tv
       - ./config/sonarr/extended/custom-services:/custom-services.d
       - ./config/sonarr/extended/custom-cont-int:/custom-cont-init.d
+    restart: unless-stopped
 
   radarr:     #Fork of Sonarr to work with movies "a la Couchpotato"
     image: lscr.io/linuxserver/radarr:latest
