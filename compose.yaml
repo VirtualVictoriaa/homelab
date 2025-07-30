@@ -15,7 +15,7 @@ services:
     ports:
       - 8085:8085
       - 6881:6881
-    restart: unlesss-stopped
+    restart: unless-stopped
 
   jellyfin:     #Main location for TV Shows, Movies, and Music
     image: lscr.io/linuxserver/jellyfin:latest
@@ -146,10 +146,5 @@ services:
       DOCKER_MODS: linuxserver/mods:universal-calibre|linuxserver/mods:lazylibrarian-ffmpeg #optional
     volumes:
       - ./config/lazylibrarian:/config
-      - /mnt/torrents/library:/libary
-    ports:
-      - 5299:5299
+      - /mnt/torrents/library:/library
     restart: unless-stopped
-
-volumes:
-  something:
