@@ -3,9 +3,12 @@ services:
     image: ghcr.io/linuxserver/qbittorrent:latest
     container_name: qbittorrent
     environment:
-      UMASK: 022
-      WEBUI_PORT: ${QBITTORRENT_UI_PORT:-8085}
-      TORRENTING_PORT: ${QBITTORRENT_TOR_PORT:-6881}
+      - WEBUI_PORT=8085
+      - TORRENTING_PORT=6881
+    ports:
+      - 8085:8085
+      - 6881:6881
+      - 6881:6881/udp
     volumes:
       - ./config/qbittorrent:/config
       - ${NASPATH}:/torrent
@@ -67,6 +70,8 @@ services:
   bazarr:     #Manages Radarr and Sonarr and downloads subtitles
     image: lscr.io/linuxserver/bazarr:latest
     container_name: bazarr
+    ports:
+      - 6767:6767
     volumes:
       - ./config/bazarr/:/config
       - /mnt/movies:/data/movies #Radarr Movies
@@ -87,6 +92,8 @@ services:
       - ./config/sonarr/extended/custom-cont-int:/custom-cont-init.d
     ports:
       - 8989:8989
+    env_file:
+      - '.env'
     restart: unless-stopped
 
   radarr:     #Fork of Sonarr to work with movies "a la Couchpotato"
@@ -138,13 +145,14 @@ services:
     image: lscr.io/linuxserver/lazylibrarian:latest
     container_name: lazylibrarian
     environment:
-      PUID: 1001
-      PGID: 1001
-      TZ: '${TZ:-America/Los_Angeles}'
       DOCKER_MODS: linuxserver/mods:universal-calibre|linuxserver/mods:lazylibrarian-ffmpeg #optional
+    ports:
+      - 5299:5299
     volumes:
       - ./config/lazylibrarian:/config
       - /mnt/library:/data/library
       - /mnt/torrents/library:/backup
-      - ${NASPATH}:/downloads 
+      - ${NASPATH}:/downloads
+    env_file:
+      - '.env'
     restart: unless-stopped
