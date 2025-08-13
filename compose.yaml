@@ -1,0 +1,150 @@
+services:
+  qbittorrent:     #Torrent
+    image: ghcr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    environment:
+      UMASK: 022
+      WEBUI_PORT: ${QBITTORRENT_UI_PORT:-8085}
+      TORRENTING_PORT: ${QBITTORRENT_TOR_PORT:-6881}
+    volumes:
+      - ./config/qbittorrent:/config
+      - ${NASPATH}:/torrent
+    restart: unless-stopped
+    healthcheck:
+      start_period: 15s
+    env_file:
+      - '.env'
+
+  jellyfin:     #Main location for TV Shows, Movies, and Music
+    image: lscr.io/linuxserver/jellyfin:latest
+    container_name: jellyfin
+    volumes:
+      - ./config/jellyfin:/config
+      - /mnt/movies:/data/movies #Radarr Movies
+      - /mnt/teevee:/data/teevee #Sonarr TV Shows
+      - /mnt/music:/data/music #Lidarr Music
+    ports:
+      - '8096:8096/tcp' #Jellyfin HTTP
+      - '7359:7359/udp' #Network discovery
+      - '1900:1900/udp' #DLNA port 
+    env_file:
+      - '.env'
+    restart: unless-stopped
+
+  jellyseerr:     #Managing requests for Jellyfin, integrates with Sonarr and Radarr
+    image: fallenbagel/jellyseerr:latest
+    container_name: jellyseerr
+    environment:
+      #PUID: 1000
+      #PGID: 1000
+      TZ: '${TZ:-America/Los_Angeles}'
+      forceIpv4First: true
+    volumes:
+      - ./config/jellyseerr:/app/config
+    ports:
+      - ${JELLYSEERR_PORT:-5055}:5055 # Jellyseerr HTTP Interface
+    healthcheck:
+       test: wget --no-verbose --tries=1 --spider http://localhost:5055/api/v1/status || exit 1
+       start_period: 20s
+       timeout: 3s
+       interval: 15s
+       retries: 3
+    restart: unless-stopped
+
+  prowlarr:     #Index manager for Sonarr and Radarr
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    volumes:
+      - ./config/prowlarr:/config
+      - ${NASPATH}:/downloads
+      - /mnt/torrents:/backup
+    ports:
+      - 9696:9696
+    env_file:
+      - '.env'
+    restart: unless-stopped
+
+  bazarr:     #Manages Radarr and Sonarr and downloads subtitles
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    volumes:
+      - ./config/bazarr/:/config
+      - /mnt/movies:/data/movies #Radarr Movies
+      - /mnt/teevee:/data/teevee #Sonarr TV Shows
+    env_file:
+      - '.env'
+    restart: unless-stopped
+
+  sonarr:     #Personal Video Recorder for TV Shows
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    volumes:
+      - ./config/sonarr:/config
+      - /mnt/teevee:/data/teevee #Sonarr TV Shows
+      - /mnt/torrents/tv:/backup #Sonarr TV Shows
+      - ${NASPATH}:/downloads
+      - ./config/sonarr/extended/custom-services:/custom-services.d
+      - ./config/sonarr/extended/custom-cont-int:/custom-cont-init.d
+    ports:
+      - 8989:8989
+    restart: unless-stopped
+
+  radarr:     #Fork of Sonarr to work with movies "a la Couchpotato"
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    volumes:
+      - ./config/radarr:/config
+      - /mnt/movies:/data/movies #Radarr Movies
+      - /mnt/torrents/movies:/backup #Radarr Movies
+      - ${NASPATH}:/downloads
+      - ./config/radarr/extended/custom-services:/custom-services.d
+      - ./config/radarr/extended/custom-cont-int:/custom-cont-init.d
+    ports:
+      - 7878:7878
+    env_file:
+      - '.env'
+    restart: unless-stopped
+
+  lidarr:     #Music collector
+    image: lscr.io/linuxserver/lidarr:latest
+    container_name: lidarr
+    volumes:
+      - ./config/lidarr:/config
+      - /mnt/music:/data/music #Lidarr Music
+      - /mnt/torrents/music:/backup #Lidarr Music
+      - ${NASPATH}:/downloads
+    ports:
+      - 8686:8686
+    env_file:
+      - '.env'
+    restart: unless-stopped
+
+  kavita:     #Main location for books
+    image: lscr.io/linuxserver/kavita:latest
+    container_name: kavita
+    volumes:
+      - ./config/kavita:/config
+      - /mnt/library:/data/library
+      - /mnt/torrents/library:/backup
+      - ${NASPATH}:/downloads
+    ports:
+      - 5000:5000
+    env_file:
+      - '.env'
+    restart: unless-stopped
+
+
+  lazylibrarian:     #Readarr replacement for collecting books
+    image: lscr.io/linuxserver/lazylibrarian:latest
+    container_name: lazylibrarian
+    environment:
+      PUID: 1001
+      PGID: 1001
+      TZ: '${TZ:-America/Los_Angeles}'
+      DOCKER_MODS: linuxserver/mods:universal-calibre|linuxserver/mods:lazylibrarian-ffmpeg #optional
+    volumes:
+      - ./config/lazylibrarian:/config
+      - /mnt/library:/data/library
+      - /mnt/torrents/library:/backup
+      - ${NASPATH}:/downloads 
+    restart: unless-stopped
