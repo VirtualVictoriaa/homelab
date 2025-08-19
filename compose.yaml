@@ -156,3 +156,30 @@ services:
     env_file:
       - '.env'
     restart: unless-stopped
+
+volumes:
+  jellyfin_transcode:
+    driver_opts:
+      type: tmpfs
+      o: "nodev,nosuid,noexec,nodiratime,size=32G"
+      device: /media/transcode-cache
+  tmp_cache:
+    driver_opts:
+      type: tmpfs
+      o: "nodev,nosuid,noexec,nodiratime,size=32G"
+      device: /media/tmp-cache
+  jellyfin_data:
+    driver_opts:
+      type: "nfs"
+      o: "addr=${STREAMING_DATA_NAS_ADDRESS:?Please set STREAMING_DATA_NAS_ADDRESS},rw,noatime,rsize=8192,wsize=8192,tcp,timeo=14,nfsvers=4"
+      device: ":${STREAMING_DATA_NAS_DEVICE:?Please set STREAMING_DATA_NAS_DEVICE}/library"
+  streaming_data:
+    driver_opts:
+      type: "nfs"
+      o: "addr=${STREAMING_DATA_NAS_ADDRESS:?Please set STREAMING_DATA_NAS_ADDRESS},rw,noatime,rsize=8192,wsize=8192,tcp,timeo=14,nfsvers=4"
+      device: ":${STREAMING_DATA_NAS_DEVICE:?Please set STREAMING_DATA_NAS_DEVICE}"
+  media_downloads:
+    driver_opts:
+      type: "nfs"
+      o: "addr=${STREAMING_DATA_NAS_ADDRESS:?Please set STREAMING_DATA_NAS_ADDRESS},rw,noatime,rsize=8192,wsize=8192,tcp,timeo=14,nfsvers=4"
+      device: ":${STREAMING_DATA_NAS_DEVICE:?Please set STREAMING_DATA_NAS_DEVICE}/downloads"
